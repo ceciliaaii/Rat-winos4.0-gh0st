@@ -29,6 +29,11 @@ jobs:
 
         $solutionPaths = Get-ChildItem -Path "demo" -Recurse -Filter *.sln | ForEach-Object { $_.FullName }
 
+        if (-not (Test-Path artifacts)) { New-Item -ItemType Directory -Path artifacts | Out-Null }
+
+        $logFile = "build.log"
+        if (Test-Path $logFile) { Remove-Item $logFile }
+
         foreach ($sln in $solutionPaths) {
           $slnDir = Split-Path $sln
           $slnFile = Split-Path $sln -Leaf
@@ -41,7 +46,8 @@ jobs:
           }
 
           Write-Host "🧱 开始构建: $slnFile" -ForegroundColor Cyan
-          msbuild $slnFile /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
+          "==== 构建 $slnFile ====" | Out-File -Append ../$logFile -Encoding UTF8
+          msbuild $slnFile /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal 2>&1 | Tee-Object -FilePath ../$logFile -Append
           $code = $LASTEXITCODE
           Pop-Location
 
@@ -53,6 +59,14 @@ jobs:
           }
         }
 
+        Write-Host "📦 收集编译产物..." -ForegroundColor Cyan
+        $releaseDirs = Get-ChildItem -Path "demo" -Recurse -Directory | Where-Object { $_.Name -match '^(Release|x64|x86)$' }
+
+        foreach ($dir in $releaseDirs) {
+          Write-Host "➡️ 添加目录: $($dir.FullName)"
+          Copy-Item -Path $dir.FullName -Destination artifacts -Recurse -Force
+        }
+
     - name: Upload Artifacts and Logs
       uses: actions/upload-artifact@v4
       with:
@@ -60,4 +74,3 @@ jobs:
         path: |
           artifacts
           build.log
-          build_*.log

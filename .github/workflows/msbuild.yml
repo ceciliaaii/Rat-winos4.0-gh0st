@@ -1,4 +1,4 @@
-name: Build All C++ Solutions
+name: Build Demo C++ Solutions
 
 on:
   push:
@@ -8,39 +8,49 @@ on:
 
 jobs:
   build:
-    name: Build All Solutions
+    name: Build All Solutions in demo/
     runs-on: windows-latest
+
+    env:
+      # 设置 UTF-8 环境，保证中文路径与输出不会乱码
+      LC_ALL: zh_CN.UTF-8
+      LANG: zh_CN.UTF-8
+      CHCP: 65001
 
     steps:
     # 1️⃣ 检出代码
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2️⃣ 安装 MSBuild
+    # 2️⃣ 设置 MSBuild（安装 Visual Studio 环境）
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    # 3️⃣ 设置 Visual Studio 构建环境
-    - name: Setup Developer Command Prompt
+    # 3️⃣ 启动 Visual Studio Developer 命令行环境
+    - name: Setup Visual Studio Developer Command Prompt
       uses: egor-tensin/vs-shell@v2
 
-    # 4️⃣ 自动扫描并构建所有 .sln 文件
-    - name: Build all .sln files
+    # 4️⃣ 自动扫描并编译 demo 目录下的所有 .sln 文件
+    - name: Build all .sln files under demo/
       shell: pwsh
       run: |
-        Write-Host "🔍 Searching for .sln files..."
-        $solutions = Get-ChildItem -Recurse -Filter *.sln
+        Write-Host "🔍 正在扫描 demo 文件夹下的所有 .sln 文件..." -ForegroundColor Cyan
+        $solutions = Get-ChildItem -Path "银狐Winos" -Recurse -Filter *.sln -ErrorAction SilentlyContinue
         if ($solutions.Count -eq 0) {
-          Write-Error "❌ No .sln files found in repository."
+          Write-Error "❌ 未在 demo 文件夹中找到任何 .sln 文件。"
           exit 1
         }
 
         foreach ($sln in $solutions) {
-          Write-Host "🛠️ Building solution: $($sln.FullName)"
+          Write-Host "🛠️ 开始编译解决方案: $($sln.FullName)" -ForegroundColor Yellow
+          # 强制使用 UTF-8 编码，支持中文路径
+          chcp 65001 > $null
           msbuild $sln.FullName /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "❌ Build failed for $($sln.FullName)"
+            Write-Error "❌ 编译失败: $($sln.FullName)"
             exit 1
+          } else {
+            Write-Host "✅ 编译成功: $($sln.FullName)" -ForegroundColor Green
           }
         }
 
@@ -48,20 +58,20 @@ jobs:
     - name: Collect build artifacts
       shell: pwsh
       run: |
-        Write-Host "📦 Collecting build output folders..."
+        Write-Host "📦 正在收集编译产物..." -ForegroundColor Cyan
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        $paths = Get-ChildItem -Recurse -Directory | Where-Object {
+        $paths = Get-ChildItem -Path "demo" -Recurse -Directory | Where-Object {
           $_.Name -match '^(Release|x64|x86)$'
         }
 
         foreach ($p in $paths) {
-          Write-Host "➡️ Adding: $($p.FullName)"
+          Write-Host "➡️ 添加: $($p.FullName)"
           Copy-Item -Path $p.FullName -Destination artifacts -Recurse -Force
         }
 
-    # 6️⃣ 上传构建产物（打包为 zip）
+    # 6️⃣ 上传构建产物
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: build-artifacts
+        name: demo-build-artifacts
         path: artifacts

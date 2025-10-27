@@ -39,7 +39,7 @@ jobs:
         if (Test-Path $logFile) { Remove-Item $logFile }
 
         Write-Host "🔍 正在扫描 demo 目录下的所有 .sln..." -ForegroundColor Cyan
-        $solutionPaths = Get-ChildItem -Path "demo" -Recurse -Filter *.sln | ForEach-Object { $_.FullName }
+        $solutionPaths = Get-ChildItem -Path "银狐Winos" -Recurse -Filter *.sln | ForEach-Object { $_.FullName }
 
         if (-not $solutionPaths) {
           Write-Host "⚠️ 没有找到任何 .sln 文件！" -ForegroundColor Yellow

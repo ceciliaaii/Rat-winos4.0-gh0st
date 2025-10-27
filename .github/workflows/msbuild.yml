@@ -21,56 +21,71 @@ jobs:
     - name: Setup Visual Studio Developer Command Prompt
       uses: egor-tensin/vs-shell@v2
 
-    - name: Build all .sln files (with Chinese path + logs)
+    - name: Build all .sln files (Chinese paths + upgrade toolset)
       shell: pwsh
       run: |
         chcp 65001 > $null
+
+        # 根目录
         $root = (Get-Location).Path
         $artifacts = Join-Path $root "artifacts"
         $logFile = Join-Path $root "build.log"
 
-        Write-Host "📁 当前工作目录: $root"
-        Write-Host "📄 日志文件路径: $logFile"
-        Write-Host "📦 构建产物路径: $artifacts"
-
-        # 保证清理旧文件
+        # 清理旧 artifacts / log
         if (Test-Path $artifacts) { Remove-Item $artifacts -Recurse -Force }
         New-Item -ItemType Directory -Path $artifacts | Out-Null
         if (Test-Path $logFile) { Remove-Item $logFile }
 
-        Write-Host "🔍 正在扫描 demo 目录下的所有 .sln..." -ForegroundColor Cyan
+        Write-Host "📁 工作目录: $root"
+        Write-Host "📦 构建产物目录: $artifacts"
+        Write-Host "📄 日志文件: $logFile"
+
+        # 扫描 银狐Winos 下所有 .sln 文件
         $solutionPaths = Get-ChildItem -Path "银狐Winos" -Recurse -Filter *.sln | ForEach-Object { $_.FullName }
 
         if (-not $solutionPaths) {
-          Write-Host "⚠️ 没有找到任何 .sln 文件！" -ForegroundColor Yellow
-          exit 1
+            Write-Host "⚠️ 未找到任何 .sln 文件！" -ForegroundColor Yellow
+            exit 1
         }
 
         foreach ($sln in $solutionPaths) {
-          Write-Host "🧱 开始构建: $sln" -ForegroundColor Cyan
-          "==== 构建 $sln ====" | Out-File -Append $logFile -Encoding UTF8
-          msbuild "`"$sln`"" /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal 2>&1 | Tee-Object -FilePath $logFile -Append
+            $slnDir = Split-Path $sln
+            $slnFile = Split-Path $sln -Leaf
 
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "❌ 编译失败: $sln" -ForegroundColor Red
-            exit 1
-          } else {
-            Write-Host "✅ 编译成功: $sln" -ForegroundColor Green
-          }
+            Write-Host "🧱 开始构建: $sln" -ForegroundColor Cyan
+            Push-Location $slnDir
+
+            # 升级工具集 v100 → v143
+            Get-ChildItem -Recurse -Filter *.vcxproj | ForEach-Object {
+                (Get-Content $_.FullName -Raw) -replace '<PlatformToolset>v100</PlatformToolset>', '<PlatformToolset>v143</PlatformToolset>' |
+                Set-Content $_.FullName -Encoding UTF8
+            }
+
+            # 用相对路径编译，避免中文路径问题
+            msbuild $slnFile /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal 2>&1 | Tee-Object -FilePath $logFile -Append
+
+            $code = $LASTEXITCODE
+            Pop-Location
+
+            if ($code -ne 0) {
+                Write-Host "❌ 编译失败: $sln" -ForegroundColor Red
+                exit 1
+            } else {
+                Write-Host "✅ 编译成功: $sln" -ForegroundColor Green
+            }
         }
 
-        Write-Host "📦 收集编译产物..." -ForegroundColor Cyan
-        $releaseDirs = Get-ChildItem -Path "demo" -Recurse -Directory | Where-Object { $_.Name -match '^(Release|x64|x86)$' }
+        # 收集 Release 产物
+        Write-Host "📦 收集构建产物..." -ForegroundColor Cyan
+        $releaseDirs = Get-ChildItem -Path "银狐Winos" -Recurse -Directory | Where-Object { $_.Name -match '^(Release|x64|x86)$' }
 
         foreach ($dir in $releaseDirs) {
-          Write-Host "➡️ 复制: $($dir.FullName)"
-          Copy-Item -Path $dir.FullName -Destination $artifacts -Recurse -Force
+            Write-Host "➡️ 复制目录: $($dir.FullName)"
+            Copy-Item -Path $dir.FullName -Destination $artifacts -Recurse -Force
         }
 
-        Write-Host "✅ 文件结构预览：" -ForegroundColor Cyan
-        Get-ChildItem -Path $artifacts -Recurse | Select-Object FullName
-
         Write-Host "✅ 完成！"
+        Write-Host "📄 日志文件已生成: $logFile"
 
     - name: Upload Artifacts and Logs
       uses: actions/upload-artifact@v4

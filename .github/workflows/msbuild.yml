@@ -1,4 +1,4 @@
-name: Build Demo C++ Solutions
+name: Build 银狐Winos C++ Solutions
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build All Solutions in demo/
+    name: Build All Solutions in 银狐Winos/
     runs-on: windows-latest
 
     env:
@@ -30,14 +30,14 @@ jobs:
     - name: Setup Visual Studio Developer Command Prompt
       uses: egor-tensin/vs-shell@v2
 
-    # 4️⃣ 自动扫描并编译 demo 目录下的所有 .sln 文件
-    - name: Build all .sln files under demo/
+    # 4️⃣ 自动扫描并编译 银狐Winos 目录下的所有 .sln 文件
+    - name: Build all .sln files under 银狐Winos/
       shell: pwsh
       run: |
-        Write-Host "🔍 正在扫描 demo 文件夹下的所有 .sln 文件..." -ForegroundColor Cyan
+        Write-Host "🔍 正在扫描 银狐Winos 文件夹下的所有 .sln 文件..." -ForegroundColor Cyan
         $solutions = Get-ChildItem -Path "银狐Winos" -Recurse -Filter *.sln -ErrorAction SilentlyContinue
         if ($solutions.Count -eq 0) {
-          Write-Error "❌ 未在 demo 文件夹中找到任何 .sln 文件。"
+          Write-Error "❌ 未在 银狐Winos 文件夹中找到任何 .sln 文件。"
           exit 1
         }
 
@@ -60,7 +60,7 @@ jobs:
       run: |
         Write-Host "📦 正在收集编译产物..." -ForegroundColor Cyan
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        $paths = Get-ChildItem -Path "demo" -Recurse -Directory | Where-Object {
+        $paths = Get-ChildItem -Path "银狐Winos" -Recurse -Directory | Where-Object {
           $_.Name -match '^(Release|x64|x86)$'
         }
 
@@ -73,5 +73,5 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: demo-build-artifacts
+        name: 银狐Winos-build-artifacts
         path: artifacts

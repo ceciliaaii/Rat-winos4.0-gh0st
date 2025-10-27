@@ -21,55 +21,37 @@ jobs:
     - name: Setup Visual Studio Developer Command Prompt
       uses: egor-tensin/vs-shell@v2
 
-    - name: Build all .sln files (safe path)
+    - name: Build all .sln files (safe path + upgrade toolset)
       shell: pwsh
       run: |
         chcp 65001 > $null
         Write-Host "🔍 正在编译所有解决方案..." -ForegroundColor Cyan
 
-        $solutionPaths = @(
-          "银狐Winos/主插件/all.sln",
-          "银狐Winos/辅助插件/expand.sln"
-        )
+        $solutionPaths = Get-ChildItem -Path "demo" -Recurse -Filter *.sln | ForEach-Object { $_.FullName }
 
         foreach ($sln in $solutionPaths) {
           $slnDir = Split-Path $sln
           $slnFile = Split-Path $sln -Leaf
+          Push-Location $slnDir
 
-          if (Test-Path $sln) {
-            Write-Host "🛠️ 开始编译: $sln" -ForegroundColor Yellow
-            Push-Location $slnDir
-            msbuild $slnFile /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
-            $code = $LASTEXITCODE
-            Pop-Location
+          Write-Host "🛠️ 正在检查并升级工具集: $sln" -ForegroundColor Yellow
+          Get-ChildItem -Recurse -Filter *.vcxproj | ForEach-Object {
+            (Get-Content $_.FullName -Raw) -replace '<PlatformToolset>v100</PlatformToolset>', '<PlatformToolset>v143</PlatformToolset>' |
+              Set-Content $_.FullName -Encoding UTF8
+          }
 
-            if ($code -ne 0) {
-              Write-Host "❌ 编译失败: $sln" -ForegroundColor Red
-              exit 1
-            } else {
-              Write-Host "✅ 编译成功: $sln" -ForegroundColor Green
-            }
+          Write-Host "🧱 开始构建: $slnFile" -ForegroundColor Cyan
+          msbuild $slnFile /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
+          $code = $LASTEXITCODE
+          Pop-Location
+
+          if ($code -ne 0) {
+            Write-Host "❌ 编译失败: $sln" -ForegroundColor Red
+            exit 1
           } else {
-            Write-Host "⚠️ 未找到文件: $sln" -ForegroundColor Red
+            Write-Host "✅ 编译成功: $sln" -ForegroundColor Green
           }
         }
 
-    - name: Collect build artifacts
-      shell: pwsh
-      run: |
-        chcp 65001 > $null
-        Write-Host "📦 正在收集编译产物..." -ForegroundColor Cyan
-        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        $paths = Get-ChildItem -Path "银狐Winos" -Recurse -Directory | Where-Object {
-          $_.Name -match '^(Release|x64|x86)$'
-        }
-        foreach ($p in $paths) {
-          Write-Host "➡️ 添加: $($p.FullName)"
-          Copy-Item -Path $p.FullName -Destination artifacts -Recurse -Force
-        }
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Winos-build-artifacts
-        path: artifacts
+    - name: Upload build artifacts
+      uses: actions/upl

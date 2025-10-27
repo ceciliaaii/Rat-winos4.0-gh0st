@@ -1,0 +1,67 @@
+name: Build All C++ Solutions
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build All Solutions
+    runs-on: windows-latest
+
+    steps:
+    # 1️⃣ 检出代码
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # 2️⃣ 安装 MSBuild
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    # 3️⃣ 设置 Visual Studio 构建环境
+    - name: Setup Developer Command Prompt
+      uses: egor-tensin/vs-shell@v2
+
+    # 4️⃣ 自动扫描并构建所有 .sln 文件
+    - name: Build all .sln files
+      shell: pwsh
+      run: |
+        Write-Host "🔍 Searching for .sln files..."
+        $solutions = Get-ChildItem -Recurse -Filter *.sln
+        if ($solutions.Count -eq 0) {
+          Write-Error "❌ No .sln files found in repository."
+          exit 1
+        }
+
+        foreach ($sln in $solutions) {
+          Write-Host "🛠️ Building solution: $($sln.FullName)"
+          msbuild $sln.FullName /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ Build failed for $($sln.FullName)"
+            exit 1
+          }
+        }
+
+    # 5️⃣ 收集构建产物
+    - name: Collect build artifacts
+      shell: pwsh
+      run: |
+        Write-Host "📦 Collecting build output folders..."
+        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+        $paths = Get-ChildItem -Recurse -Directory | Where-Object {
+          $_.Name -match '^(Release|x64|x86)$'
+        }
+
+        foreach ($p in $paths) {
+          Write-Host "➡️ Adding: $($p.FullName)"
+          Copy-Item -Path $p.FullName -Destination artifacts -Recurse -Force
+        }
+
+    # 6️⃣ 上传构建产物（打包为 zip）
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: artifacts

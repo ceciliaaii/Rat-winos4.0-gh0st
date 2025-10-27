@@ -1,4 +1,4 @@
-name: Build 银狐Winos C++ Solutions
+name: Build winosdemo1 C++ Solutions
 
 on:
   push:

@@ -53,10 +53,11 @@ jobs:
           }
         }
 
-    - name: Upload build artifacts
-    - name: Upload build artifacts
+    - name: Upload Artifacts and Logs
       uses: actions/upload-artifact@v4
       with:
         name: Winos-build-artifacts
-        path: "**/Release/**"
-
+        path: |
+          artifacts
+          build.log
+          build_*.log

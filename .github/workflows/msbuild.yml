@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build All Solutions in 银狐Winos/
+    name: Build All Solutions in demo4
     runs-on: windows-latest
 
     env:

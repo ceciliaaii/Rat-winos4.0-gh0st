@@ -8,41 +8,57 @@ on:
 
 jobs:
   build:
-    name: Build All Solutions in demo4
+    name: Build All Solutions in 银狐Winos
     runs-on: windows-latest
-
-    env:
-      # 设置 UTF-8 环境，保证中文路径与输出不会乱码
-      LC_ALL: zh_CN.UTF-8
-      LANG: zh_CN.UTF-8
-      CHCP: 65001
 
     steps:
     # 1️⃣ 检出代码
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2️⃣ 设置 MSBuild（安装 Visual Studio 环境）
+    # 2️⃣ 设置 MSBuild 环境
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    # 3️⃣ 启动 Visual Studio Developer 命令行环境
+    # 3️⃣ 启动 Visual Studio 开发命令行环境
     - name: Setup Visual Studio Developer Command Prompt
       uses: egor-tensin/vs-shell@v2
 
-    # 4️⃣ 自动扫描并编译 银狐Winos 目录下的所有 .sln 文件
-    - name: Build Solution A
-      run: msbuild 银狐Winos/主插件/all.sln /p:Configuration=Release /m
+    # 4️⃣ 编译两个解决方案（支持中文路径）
+    - name: Build all .sln files
+      shell: pwsh
+      run: |
+        chcp 65001 > $null
+        Write-Host "🔍 正在编译所有解决方案..." -ForegroundColor Cyan
 
-    - name: Build Solution B
-      run: msbuild 银狐Winos/辅助插件/expand.sln /p:Configuration=Release /m
+        $solutions = @(
+          "银狐Winos/主插件/all.sln",
+          "银狐Winos/辅助插件/expand.sln"
+        )
+
+        foreach ($sln in $solutions) {
+          if (Test-Path $sln) {
+            Write-Host "🛠️ 开始编译: $sln" -ForegroundColor Yellow
+            msbuild "`"$sln`"" /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "❌ 编译失败: $sln"
+              exit 1
+            } else {
+              Write-Host "✅ 编译成功: $sln" -ForegroundColor Green
+            }
+          } else {
+            Write-Error "⚠️ 未找到文件: $sln"
+          }
+        }
 
     # 5️⃣ 收集构建产物
     - name: Collect build artifacts
       shell: pwsh
       run: |
+        chcp 65001 > $null
         Write-Host "📦 正在收集编译产物..." -ForegroundColor Cyan
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+
         $paths = Get-ChildItem -Path "银狐Winos" -Recurse -Directory | Where-Object {
           $_.Name -match '^(Release|x64|x86)$'
         }
@@ -56,5 +72,5 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: 银狐Winos-build-artifacts
+        name: Winos-build-artifacts
         path: artifacts
